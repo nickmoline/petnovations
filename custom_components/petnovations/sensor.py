@@ -165,6 +165,15 @@ class PetnovationsSensor(CoordinatorEntity):
                     return f"{minutes} minutes"
             else:
                 return device.get("configuration", {}).get(self.sub_key, "Unknown")
+        elif self.key == 'visit':
+            if self.sub_key == 'timestamp':
+                ts = device.get(self.key, {}).get("timestamp", 0)
+                return datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+            elif self.sub_key == 'lastVisit':
+                return time_ago(device.get(self.key, {}).get("machineTS", ""))
+            elif self.sub_key == 'duration':
+                seconds = device.get(self.key, {}).get("durationSeconds", 0)
+                return f"{seconds} second{'s' if seconds != 1 else ''}"
         else:
             return device.get(self.key, "Unknown")
 
@@ -217,6 +226,11 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
             if "heater" in device:
                 sensors.append(PetnovationsSensor(coordinator, device, 'configuration', 'heater_tempOutRef' , f"{device['name']} Heater Temperature Output"))
+
+        if "visit" in device:
+            sensors.append(PetnovationsSensor(coordinator, device, 'visit', 'timestamp', f"{device['name']} Last Visit Timestamp"))
+            sensors.append(PetnovationsSensor(coordinator, device, 'visit', 'lastVisit' f"{device['name']} Last Visit"))
+            sensors.append(PetnovationsSensor(coordinator, device, 'visit', 'duration', f"{device['name']} Last Visit Duration"))
 
     async_add_entities(sensors, True)
 

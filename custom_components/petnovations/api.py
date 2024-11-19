@@ -61,7 +61,46 @@ class PetnovationsAPI:
                             _LOGGER.debug("Retry device response text: %s", retry_response_text)
                             return await retry_response.json()
                     
+                    deviceIndexes = {};
+                    for index, device in enumerate(response_json.get("thingList", [])):
+                        deviceIndexes[device.manufacturerId] = index;
+
+                    visits = self.get_visits()
+
+                    for visit in visits.get("visitResponses", []):
+                        visit['fields']['timestamp'] = visit['timestamp']
+                        visit['fields']['machineTS'] = visit['machineTS'];
+                        index = deviceIndexes[visitfields.serialNumber]
+                        if response_json.['thingList'][index].get('visit', None) is None:
+                            response_json['thingList'][index].visit = visit['fields']
+
                     return response_json
         except Exception as e:
             _LOGGER.error("Error fetching devices: %s", e)
             raise                   
+
+    async def get_visits(self):
+        url = "https://iot.petnovations.com/device/history/account/pet/statistics?startTime=2024-10-19T07:00:00.000Z"
+        if self.token is None:
+            await self._get_new_token()
+        headers = {"Authorization": f"Bearer {self.token}"}
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers) as response:
+                    response_text = await response.text()
+                    _LOGGER.debug("Device response text: %s", response_text)
+                    response_json = await response.json()
+                    
+                    if response.status == 401:  # Unauthorized, token might be invalid
+                        await self._get_new_token()
+                        headers = {"Authorization": f"Bearer {self.token}"}
+                        async with session.get(url, headers=headers) as retry_response:
+                            retry_response_text = await retry_response.text()
+                            _LOGGER.debug("Retry device response text: %s", retry_response_text)
+                            return await retry_response.json()
+                    
+                    return response_json
+        except Exception as e:
+            _LOGGER.error("Error fetching visits: %s", e)
+            raise                   
+
